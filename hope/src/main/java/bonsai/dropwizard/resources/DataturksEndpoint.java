@@ -777,14 +777,15 @@ public class DataturksEndpoint {
             throw e;
         }
     }
+
     @POST
-    @Path("/{projectId}/fetchStatsForDate")
-    public List<ContributorDetails> fetchStatsForDate(@NotNull @HeaderParam("token") String token,
+    @Path("/{projectId}/fetchProjectStatsForDate") // Date expected in DD/MM/YYY
+    public List<ContributorDetails> fetchProjectStatsForDate(@NotNull @HeaderParam("token") String token,
             @NotNull @HeaderParam("uid") String id, @NotNull @PathParam("projectId") String projectId,
             @NotNull @QueryParam("date") String date) throws ParseException {
 
         LoginAuth.validateAndGetDataturksUserIdElseThrowException(id, token);
-        List<ContributorDetails> details=Controlcenter.fetchStatsForDateInternal(projectId, date);
+        List<ContributorDetails> details = Controlcenter.fetchProjectStatsForDateInternal(projectId, date);
         return details;
     }
     

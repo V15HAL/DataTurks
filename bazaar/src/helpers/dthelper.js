@@ -347,9 +347,17 @@ export const fetchProjectStats = (pid, callback) => {
     });
 };
 
-export const getStatsForDate = (pid,date,callback) => {
+export const dateToLocalString = (dateObj)=> {
+  var date = dateObj.getDate();
+  var month = dateObj.getMonth() + 1;
+  var year = dateObj.getFullYear();
+
+  return date + "/" + month + "/" + year;
+};
+
+export const getStatsForDate = (pid, date, callback) => {
   const { uid, token } = getUidToken();
-  let url= BASE_URL+pid+"/fetchStatsForDate?date="+date;
+  let url = BASE_URL + pid + "/fetchProjectStatsForDate?date=" + dateToLocalString(date);
   superagent
     .post(url)
     .set("uid", uid)
@@ -357,7 +365,8 @@ export const getStatsForDate = (pid,date,callback) => {
     .end((err, res) => {
       callback(err, res);
     });
-}  
+};
+
 export const fetchHitsDetails = (
   pid,
   start,

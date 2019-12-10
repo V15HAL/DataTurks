@@ -153,10 +153,9 @@ export default class TaggerOrgProject extends Component {
       successModal: false,
       selectedLabel: undefined,
       date: null,
-      dateStats:null,
-      dateStatsError:undefined
+      dateStats: null,
+      dateStatsError: undefined
     };
-    
   }
 
   state = {
@@ -170,22 +169,10 @@ export default class TaggerOrgProject extends Component {
     projectDetailsError: undefined,
     hitsDetails: undefined,
     date: null,
-    dateStats:null,
-    dateStatsError:undefined
+    dateStats: null,
+    dateStatsError: undefined
   };
 
-  onChange = date => 
-  {
-    this.setState({date});
-    getStatsForDate(this.props.currentProject, date.toLocaleDateString(),this.dateStatsFetched);
-  }
-  setInitialDate(){
-    const date = new Date();
-    this.setState({date:date});
-    if(this.props.currentProject){
-    getStatsForDate(this.props.currentProject, date.toLocaleDateString(),this.dateStatsFetched);
-    }
-  }
   componentWillMount() {
     console.log("TaggerStats componentWillMount");
     if (
@@ -227,7 +214,7 @@ export default class TaggerOrgProject extends Component {
         20,
         this.hitsFetched,
         "done"
-      );  
+      );
     }
     this.setInitialDate();
     // if (this.props.currentProject) {
@@ -284,6 +271,19 @@ export default class TaggerOrgProject extends Component {
     // this.setState({ isMounted: false });
   }
 
+  onDateChange = date => {
+    this.setState({date});
+    getStatsForDate(this.props.currentProject, date, this.dateStatsFetched);
+  }
+
+  setInitialDate() {
+    const date = new Date();
+    this.setState({date: date});
+    if (this.props.currentProject) {
+    getStatsForDate(this.props.currentProject, date, this.dateStatsFetched);
+    }
+  }
+
   getContributorsData = data => {
     const arrs = [];
     console.log("getContributorsData ", data);
@@ -295,7 +295,7 @@ export default class TaggerOrgProject extends Component {
       if (data[index].hitsDone > 0 || showZero) {
         arrs.push(
           <tr key={index}>
-            <td>{data[index].userDetails.firstName+" "+data[index].userDetails.secondName}</td>
+            <td>{data[index].userDetails.firstName + " " + data[index].userDetails.secondName}</td>
             <td>{data[index].avrTimeTakenInSec}</td>
             <td>{data[index].hitsDone}</td>
           </tr>
@@ -307,16 +307,16 @@ export default class TaggerOrgProject extends Component {
 
   dateStatsFetched(error, response) {
     if (!error) {
-       this.setState({  
+       this.setState({
         dateStats: response.body,
         dateStatsError: undefined
       });
     } else {
       if (response && response.body && response.body.message) {
         this.setState({ dateStatsError: response.body.message });
-      } else {  
+      } else {
         this.setState({ dateStatsError: "Error in fetching data" });
-      } 
+      }
     }
   }
 
@@ -467,10 +467,9 @@ export default class TaggerOrgProject extends Component {
     } else {
       fetchProjectStats(this.props.currentProject, this.projectDetailsFetched);
     }
-    
   }
 
-  inviteSent(error, response) { 
+  inviteSent(error, response) {
     console.log("invite sent ", error, response);
     if (!error) {
       logEvent("buttons", "Invite sent success");
@@ -1680,7 +1679,7 @@ export default class TaggerOrgProject extends Component {
                         disabled={!permissions.canUploadData}
                         onClick={this.openScreen.bind(this, "edit", "file")}
                       >
-                        {" "} 
+                        {" "}
                         <Icon name="add circle" color="blue" /> Add Data
                       </Dropdown.Item>
                       <Dropdown.Item
@@ -2040,41 +2039,40 @@ export default class TaggerOrgProject extends Component {
           )}
         <br />
         <br />
-        {
-        (
-            <div
-              className="text-center"
-              style={{ display: "flex", justifyContent: "space-around" }}
+        { this.state.date && (
+          <div
+            className="text-center"
+            style={{ display: "flex", justifyContent: "space-around" }}
+          >
+            <Segment.Group
+              loading={this.state.loading}
+              style={{ width: "60%" }}
+              centered
             >
-              <Segment.Group
-                loading={this.state.loading}
-                style={{ width: "60%" }}
-                centered
-              >
-                <Header attached="top" block as="h4">
-                  <Icon name="line chart" disabled />
-                  <Header.Content>Stats for the selected date
-                      <DatePicker 
-                      onChange={this.onChange}
-                      value={this.state.date}
-                      maxDate={new Date()}
-                      />  
-                  </Header.Content>
-                </Header>
-                {this.state.dateStats&&(
-                <Table striped bordered condensed hover responsive>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Time(s) / HIT</th>
-                      <th>#HITs done</th>
-                    </tr>
-                  </thead>
-                  {this.getContributorsData(this.state.dateStats)}
-                </Table>
-                )}
-              </Segment.Group>
-            </div>
+              <Header attached="top" block as="h4">
+                <Icon name="line chart" disabled />
+                <Header.Content>Stats for the selected date
+                    <DatePicker
+                    onChange={this.onDateChange}
+                    value={this.state.date}
+                    maxDate={new Date()}
+                    />
+                </Header.Content>
+              </Header>
+              { this.state.dateStats && (
+              <Table striped bordered condensed hover responsive>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Time(s) / HIT</th>
+                    <th>#HITs done</th>
+                  </tr>
+                </thead>
+                {this.getContributorsData(this.state.dateStats)}
+              </Table>
+              )}
+            </Segment.Group>
+          </div>
         )}
         <br />
         <br />

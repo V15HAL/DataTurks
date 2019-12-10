@@ -1379,7 +1379,7 @@ public class Controlcenter {
         user.setUpdated_timestamp(new Date());
         AppConfig.getInstance().getdUsersDAO().saveOrUpdateInternal(user);
     }
-    public static List<ContributorDetails> fetchStatsForDateInternal(String projectId, String date) {
+    public static List<ContributorDetails> fetchProjectStatsForDateInternal(String projectId, String date) {
         DProjects project = AppConfig.getInstance().getdProjectsDAO().findByIdInternal(projectId);
         if (project == null) {
             throw new WebApplicationException("No such project found", Response.Status.NOT_FOUND);
@@ -1389,10 +1389,10 @@ public class Controlcenter {
         List<DProjectUsers> projectUsers = AppConfig.getInstance().getdProjectUsersDAO()
                 .findAllByProjectIdInternal(project.getId());
 
-        return fetchStatsForDate(results, projectUsers, date);
+        return fetchProjectStatsForDate(results, projectUsers, date);
     }
 
-    public static List<ContributorDetails> fetchStatsForDate(List<DHitsResult> results,
+    public static List<ContributorDetails> fetchProjectStatsForDate(List<DHitsResult> results,
             List<DProjectUsers> projectUsers, String inpDate) {
         SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy");
         SimpleDateFormat parser = new SimpleDateFormat("dd/MM/yyyy");
