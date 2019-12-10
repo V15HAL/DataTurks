@@ -60,12 +60,14 @@ import {
   ENTITY_COLORS,
   createEntities,
   createEntitiesJson,
-  getDetaultShortcuts,
+  getDefaultShortcuts,
   convertKeyToString,
   POS_TAGGING,
   TEXT_SUMMARIZATION,
+  SENTENCE_TRANSLATION,
   IMAGE_BOUNDING_BOX,
   TEXT_CLASSIFICATION,
+  SENTENCE_PAIR_CLASSIFIER,
   HIT_STATE_SKIPPED,
   HIT_STATE_DONE,
   HIT_STATE_NOT_DONE,
@@ -201,7 +203,7 @@ export default class TaggerSpace extends Component {
       const rules = JSON.parse(this.props.projectDetails.taskRules);
       const entities = createEntitiesJson(this.props.projectDetails.taskRules).entities;
       const entityColorMap = createDocEntityColorMap(entities, ENTITY_COLORS);
-      let shortcuts = getDetaultShortcuts(
+      let shortcuts = getDefaultShortcuts(
         this.props.projectDetails.task_type,
         entities
       );
@@ -310,16 +312,18 @@ export default class TaggerSpace extends Component {
         loading: false,
         currentStart: 0,
         currentCount: 1,
+        hitIDsDone: new Set(),
         startTime: new Date().getTime()
       };
     } else if (
       this.props.projectDetails &&
       this.props.currentHit &&
       (this.props.projectDetails.task_type === TEXT_SUMMARIZATION ||
-        this.props.projectDetails.task_type === TEXT_MODERATION)
+        this.props.projectDetails.task_type === TEXT_MODERATION ||
+        this.props.projectDetails.task_type === SENTENCE_TRANSLATION)
     ) {
       const rules = JSON.parse(this.props.projectDetails.taskRules);
-      let shortcuts = getDetaultShortcuts(this.props.projectDetails.task_type);
+      let shortcuts = getDefaultShortcuts(this.props.projectDetails.task_type);
       if ("shortcuts" in rules) {
         shortcuts = rules.shortcuts;
       }
@@ -347,18 +351,20 @@ export default class TaggerSpace extends Component {
         loading: false,
         currentStart: 0,
         currentCount: 1,
+        hitIDsDone: new Set(),
         startTime: new Date().getTime()
       };
     } else if (
       this.props.projectDetails &&
       this.props.currentHit &&
       (this.props.projectDetails.task_type === TEXT_CLASSIFICATION ||
+        this.props.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER ||
         this.props.projectDetails.task_type === VIDEO_CLASSIFICATION ||
         this.props.projectDetails.task_type === IMAGE_CLASSIFICATION)
     ) {
       const rules = JSON.parse(this.props.projectDetails.taskRules);
       const entities = createEntitiesJson(this.props.projectDetails.taskRules).entities;
-      let shortcuts = getDetaultShortcuts(
+      let shortcuts = getDefaultShortcuts(
         this.props.projectDetails.task_type,
         entities
       );
@@ -404,6 +410,7 @@ export default class TaggerSpace extends Component {
         loading: false,
         currentStart: 0,
         currentCount: 1,
+        hitIDsDone: new Set(),
         startTime: new Date().getTime()
       };
     } else if (
@@ -420,7 +427,7 @@ export default class TaggerSpace extends Component {
       const entities = createEntities(this.props.projectDetails.taskRules).entities;
       const entityColorMap = createDocEntityColorMap(entities, ENTITY_COLORS);
       const hits = [];
-      let shortcuts = getDetaultShortcuts(
+      let shortcuts = getDefaultShortcuts(
         this.props.projectDetails.task_type,
         entities
       );
@@ -497,6 +504,7 @@ export default class TaggerSpace extends Component {
         loading: false,
         currentStart: 0,
         currentCount: 1,
+        hitIDsDone: new Set(),
         startTime: new Date().getTime()
       };
     } else {
@@ -527,6 +535,7 @@ export default class TaggerSpace extends Component {
         entityColorMap: {},
         currentStart: 0,
         currentCount: this.getDefaultCount(),
+        hitIDsDone: new Set(),
         DEFAULT_COUNT: this.getDefaultCount(),
         activeIndex: -1,
         action: "",
@@ -574,6 +583,7 @@ export default class TaggerSpace extends Component {
     const editor = document.getElementById("write_text");
     console.log("editor is ", editor);
     if (editor !== null) {
+      editor.focus();
       editor.setAttribute("data-gramm", "false");
     }
     // this.loadData()
@@ -652,6 +662,7 @@ export default class TaggerSpace extends Component {
     const editor = document.getElementById("write_text");
     console.log("editor is ", editor);
     if (editor !== null) {
+      editor.focus();
       editor.setAttribute("data-gramm", "false");
     }
   }
@@ -668,7 +679,9 @@ export default class TaggerSpace extends Component {
         case POS_TAGGING:
         case TEXT_MODERATION:
         case TEXT_SUMMARIZATION:
+        case SENTENCE_TRANSLATION:
         case TEXT_CLASSIFICATION:
+        case SENTENCE_PAIR_CLASSIFIER:
         case IMAGE_CLASSIFICATION:
         case VIDEO_CLASSIFICATION:
           return 10;
@@ -788,9 +801,11 @@ export default class TaggerSpace extends Component {
     console.log("setClassification", entity, event);
     const { currentTags, changesInSession } = this.state;
     console.log("setClassification", entity);
+    const isMutex = this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER;
     if (currentTags.has(entity)) {
       currentTags.delete(entity);
     } else {
+      if (isMutex) currentTags.clear();
       currentTags.add(entity);
     }
     this.setState({ currentTags, changesInSession: changesInSession + 1 });
@@ -869,7 +884,7 @@ export default class TaggerSpace extends Component {
           }}
         >
           <Form
-            size="mini"
+            size="medium"
             style={{
               border: "2px solid",
               padding: "2em",
@@ -1110,8 +1125,9 @@ export default class TaggerSpace extends Component {
       const status = hit.status;
       return (
         <div>
-            {fileName && <Label title="File Name" size="mini">{fileName}</Label>}
-            {status && <Label title="HIT status" style={{ textTransform: 'capitalize' }} size="mini">{hitStateNameMap[status]}</Label>}
+            {fileName && <Label title="File Name" size="medium">{fileName}</Label>}
+            {status && <Label title="HIT status" style={{ textTransform: 'capitalize' }} size="medium">{hitStateNameMap[status]}</Label>}
+            {<Label title="Done Counter" style={{ textTransform: 'capitalize' }} size="medium">{'Currently Done: ' + (this.state.hitIDsDone.size)}</Label>}
         </div>
       );
     }
@@ -1145,9 +1161,9 @@ export default class TaggerSpace extends Component {
             </Card.Description>
           </Card.Content>
           <Card.Content extra>
-            {status && <Label size="mini">{hitStateNameMap[status]}</Label>}
-            {evaluation && <Label style={{ textTransform: 'capitalize' }} color="green" size="mini">{evaluation}</Label>}
-          <Label size="mini" color="teal" attached="top right">
+            {status && <Label size="medium">{hitStateNameMap[status]}</Label>}
+            {evaluation && <Label style={{ textTransform: 'capitalize' }} color="green" size="medium">{evaluation}</Label>}
+          <Label size="medium" color="teal" attached="top right">
             Annotator Info
           </Label>
           </Card.Content>
@@ -1234,11 +1250,13 @@ export default class TaggerSpace extends Component {
       return tagString.trim();
     } else if (
       this.state.projectDetails.task_type === TEXT_SUMMARIZATION ||
-      this.state.projectDetails.task_type === TEXT_MODERATION
+      this.state.projectDetails.task_type === TEXT_MODERATION ||
+      this.state.projectDetails.task_type === SENTENCE_TRANSLATION
     ) {
       return this.state.textSummary;
     } else if (
       this.state.projectDetails.task_type === TEXT_CLASSIFICATION ||
+      this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER ||
       this.state.projectDetails.task_type === IMAGE_CLASSIFICATION ||
       this.state.projectDetails.task_type === VIDEO_CLASSIFICATION
     ) {
@@ -1302,6 +1320,7 @@ export default class TaggerSpace extends Component {
       start: 0,
       currentHit: undefined,
       currentCount: this.state.DEFAULT_COUNT,
+      hitIDsDone: new Set(),
       hitsCompleted: false,
       changesInSession: 0
     });
@@ -1388,6 +1407,19 @@ export default class TaggerSpace extends Component {
         return false;
       }
     }
+    if (this.state.currentTags.size < 1 &&
+      this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER) {
+        alert("Please choose atleast one tag");
+        return false;
+    }
+    if (this.state.projectDetails.task_type === TEXT_SUMMARIZATION ||
+      this.state.projectDetails.task_type === SENTENCE_TRANSLATION ||
+      this.state.projectDetails.task_type === TEXT_MODERATION) {
+      if (result === null || result.length <= 0) {
+        alert("Please type something");
+        return false;
+      }
+    }
     this.state.action = action ? action : 'moveToDone';
     this.state.changesInSession = 0;
     this.setState({ loading: true, action: action ? action : 'moveToDone' });
@@ -1413,6 +1445,7 @@ export default class TaggerSpace extends Component {
       }
     }
     this.setState({ loading: true, action: 'moveToDone' });
+    this.state.hitIDsDone.delete(currentHit.id); // Just in-case it was added
     updateHitStatus(currentHit.id, this.props.currentProject, HIT_STATE_SKIPPED, result, this.moveToDoneCallback.bind(this));
   }
 
@@ -1537,7 +1570,7 @@ export default class TaggerSpace extends Component {
       const entitiesObject = createEntitiesJson(projectDetails.taskRules);
       const entities = entitiesObject.entities;
       const entityJson = entitiesObject.entityJson;
-      let shortcuts = getDetaultShortcuts(projectDetails.task_type, entities);
+      let shortcuts = getDefaultShortcuts(projectDetails.task_type, entities);
       const entityColorMap = createDocEntityColorMap(entities, ENTITY_COLORS);
       this.state.entityColorMap = entityColorMap;
       if ("shortcuts" in rules) {
@@ -1587,7 +1620,8 @@ export default class TaggerSpace extends Component {
             }
           } else if (
             projectDetails.task_type === TEXT_SUMMARIZATION ||
-            projectDetails.task_type === TEXT_MODERATION
+            projectDetails.task_type === TEXT_MODERATION ||
+            projectDetails.task_type === SENTENCE_TRANSLATION
           ) {
             if (response.body.hits.length > 0) {
               let textSummary = "";
@@ -1606,7 +1640,7 @@ export default class TaggerSpace extends Component {
                 action: ""
               });
             }
-          } else if (projectDetails.task_type === TEXT_CLASSIFICATION) {
+          } else if (projectDetails.task_type === TEXT_CLASSIFICATION || projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER) {
             if (response.body.hits.length > 0) {
               let currentTags = new Set();
               let currentNote = "";
@@ -1881,6 +1915,7 @@ export default class TaggerSpace extends Component {
       const chits = this.state.hits;
       let nextIndex = -1;
       let imgLoaded = false;
+      let currentHit = this.state.currentHit;
 
       // chits[currentIndex].result = getTaggedResult
       // for (let index = this.state.currentIndex + 1; index < chits.length; index ++) {
@@ -1890,6 +1925,7 @@ export default class TaggerSpace extends Component {
       //   }
       // }
       if ((action && action === "moveToDone") || this.state.action === "moveToDone") {
+        this.state.hitIDsDone.add(currentHit.id);
         nextIndex = this.state.currentIndex;
         this.state.currentStart = this.state.currentStart - 1;
         chits.splice(this.state.currentIndex, 1);
@@ -1899,6 +1935,7 @@ export default class TaggerSpace extends Component {
           nextIndex = nextIndex - 1;
         }
       } else if ((action && action === "saveToDone") || this.state.action === "saveToDone") {
+        this.state.hitIDsDone.add(currentHit.id);
         if (this.state.currentIndex + 1 < chits.length) {
           nextIndex = this.state.currentIndex + 1;
         }
@@ -1917,7 +1954,6 @@ export default class TaggerSpace extends Component {
       }
       // chits.splice(0, 1);
       // console.log(' Hit Added ', chits);
-      let currentHit = this.state.currentHit;
       if (nextIndex > -1 &&  nextIndex < chits.length) {
         currentHit = chits[nextIndex];
         let currentTags = new Set();
@@ -1939,6 +1975,7 @@ export default class TaggerSpace extends Component {
         if (currentHit.result && currentHit.result !== null) {
           if (
             this.state.projectDetails.task_type === TEXT_CLASSIFICATION ||
+            this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER ||
             this.state.projectDetails.task_type === IMAGE_CLASSIFICATION ||
             this.state.projectDetails.task_type === VIDEO_CLASSIFICATION
           ) {
@@ -1954,7 +1991,8 @@ export default class TaggerSpace extends Component {
             }
           } else if (
             this.state.projectDetails.task_type === TEXT_SUMMARIZATION ||
-            this.state.projectDetails.task_type === TEXT_MODERATION
+            this.state.projectDetails.task_type === TEXT_MODERATION ||
+            this.state.projectDetails.task_type === SENTENCE_TRANSLATION
           ) {
             textSummary = currentHit.result;
           } else if (
@@ -1984,11 +2022,13 @@ export default class TaggerSpace extends Component {
         } else if (currentHit.hitResults !== null) {
           if (
             this.state.projectDetails.task_type === TEXT_SUMMARIZATION ||
-            this.state.projectDetails.task_type === TEXT_MODERATION
+            this.state.projectDetails.task_type === TEXT_MODERATION ||
+            this.state.projectDetails.task_type === SENTENCE_TRANSLATION
           ) {
             textSummary = currentHit.hitResults[0].result;
           } else if (
             this.state.projectDetails.task_type === TEXT_CLASSIFICATION ||
+            this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER ||
             this.state.projectDetails.task_type === IMAGE_CLASSIFICATION ||
             this.state.projectDetails.task_type === VIDEO_CLASSIFICATION
           ) {
@@ -2091,6 +2131,7 @@ export default class TaggerSpace extends Component {
     logEvent("buttons", "Skip hit");
     logEvent("Mark As", 'Skipped');
     this.setState({ loading: true, action: "next", changesInSession: 0 });
+    this.state.hitIDsDone.delete(this.state.currentHit.id); // Just in-case it was added
     skipHits(
       this.state.currentHit.id,
       this.props.currentProject,
@@ -2333,6 +2374,65 @@ export default class TaggerSpace extends Component {
     );
   }
 
+  showTextPairs() {
+    // const currentHit = this.state.currentHit;
+    const splitArr = this.state.currentHit.data.split('|');
+    const srcTxt = splitArr[1];
+    const destTxt = splitArr[2];
+    console.log("show text", this.state);
+    return (
+      <div className={styles.tagArea}>
+        <p className={styles.textStyle}>{srcTxt}</p>
+        <hr style={{border: '2px dashed rgb(0, 181, 173)'}}/>
+        <p className={styles.textStyle}>{destTxt}</p>
+        {splitArr.length > 3 &&
+        <div>
+          <hr style={{border: '2px dashed rgb(0, 181, 173)'}}/>
+          <p className={styles.textStyle}>{splitArr[3]}</p>
+        </div>
+        }
+        <hr style={{border: '2px dashed rgb(0, 181, 173)'}}/>
+        {this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER &&
+          this.state.currentTags &&
+          this.state.currentTags.size > 0 &&
+          this.showCurrentTags()}
+      </div>
+    );
+  }
+
+  showTranslationText() {
+    // const currentHit = this.state.currentHit;
+    const dataArr = this.state.currentHit.data.split('|');
+    const srcTxt = dataArr.length > 1 ? dataArr[1] : dataArr[0];
+
+    console.log("show text", this.state);
+    return (
+      <div>
+        <label> Source Text </label>
+        <div className={styles.tagArea}>
+          <p className={styles.textStyle}>{srcTxt}</p>
+        </div>
+        <br />
+        { dataArr.length > 2 &&
+        <div>
+          <label> Uncorrected Translation </label>
+          <div className={styles.tagArea}>
+            <p className={styles.textStyle}>{dataArr[2]}</p>
+          </div>
+        </div>
+        }
+        {/* <Button
+          className={styles.copyButton}
+          size="small"
+          onClick={this.copyToClipboard}
+        >
+          <Icon name="copy" color="teal" />
+          Copy
+        </Button> */}
+      </div>
+    );
+  }
+
   showTextAnnotation() {
     // const currentHit = this.state.currentHit;
     const { data } = this.state.currentHit;
@@ -2340,7 +2440,7 @@ export default class TaggerSpace extends Component {
     return (
       <div className={styles.tagArea}>
         <p className={styles.textStyle}>{data}</p>
-        {this.state.projectDetails.task_type === TEXT_CLASSIFICATION &&
+        {(this.state.projectDetails.task_type === TEXT_CLASSIFICATION || this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER) &&
           this.state.currentTags &&
           this.state.currentTags.size > 0 &&
           this.showCurrentTags()}
@@ -2363,6 +2463,13 @@ export default class TaggerSpace extends Component {
     this.setState({ changesInSession, textSummary: value });
   }
 
+  handleWriteTextOnKeyPress(event) {
+    // Prevent text field new line when Enter is pressed
+    if (event.key === "Enter") {
+      event.preventDefault();
+    }
+  }
+
   showWriteText(type) {
     if (type === TEXT_SUMMARIZATION) {
       return (
@@ -2373,6 +2480,10 @@ export default class TaggerSpace extends Component {
           label="Summary"
           value={this.state.textSummary}
           placeholder="Write text summary here..."
+          style={{
+            width: "100%",
+            height: "100%"
+          }}
         />
       );
     } else if (type === TEXT_MODERATION) {
@@ -2384,6 +2495,26 @@ export default class TaggerSpace extends Component {
           label="Moderated Text"
           value={this.state.textSummary}
           placeholder="Write moderated text here..."
+          style={{
+            width: "100%",
+            height: "100%"
+          }}
+        />
+      );
+    } else if (type === SENTENCE_TRANSLATION) {
+      return (
+        <Form.Field
+          id="write_text"
+          control={TextArea}
+          onChange={this.handleChange.bind(this, "summary")}
+          label="Translated Text"
+          value={this.state.textSummary}
+          placeholder="Write translated text here..."
+          onKeyPress={(e) => { this.handleWriteTextOnKeyPress(e) }}
+          style={{
+            width: "100%",
+            height: "100%"
+          }}
         />
       );
     }
@@ -3034,7 +3165,7 @@ export default class TaggerSpace extends Component {
               backgroundColor: this.state.entityColorMap[entity]
             }}
             compact
-            size="mini"
+            size="medium"
             name={entity}
             className={styles.clickableLabel}
             onClick={this.setClassification.bind(this, entity)}
@@ -3060,12 +3191,12 @@ export default class TaggerSpace extends Component {
                             backgroundColor: '#f5f9fa', border: '1px solid #eaf2f4', boxSizing: 'border-box',
                             display: 'flex', justifyContent: 'flex-start', flexDirection: 'column',
                             height: `${height}`, overflow: 'auto' }}>
-                <Label size="mini" attached="top left">
+                <Label size="medium" attached="top left" >
                   Select Label
                 </Label>
                 <div>
                   { entiti.length > minSearchEntities &&
-                    <Input size="mini" value={this.state.searchQuery} onChange={(event) => this.setState({searchQuery: event.target.value })} placeholder="Search..." />
+                    <Input size="medium" value={this.state.searchQuery} onChange={(event) => this.setState({searchQuery: event.target.value })} placeholder="Search..." />
                   }
                 </div>
                 {renderArrs}
@@ -3110,7 +3241,7 @@ export default class TaggerSpace extends Component {
             this.state.type === HIT_STATE_REQUEUED) && (
             <Button
               compact
-              size="mini"
+              size="medium"
               color="blue"
               icon
               onClick={this.moveToDone.bind(this, "moveToDone")}
@@ -3126,7 +3257,7 @@ export default class TaggerSpace extends Component {
             this.state.type === HIT_STATE_DELETED) && (
             <Button
               compact
-              size="mini"
+              size="medium"
               color="blue"
               title="Mark as skipped"
               icon
@@ -3143,7 +3274,7 @@ export default class TaggerSpace extends Component {
               this.state.type === HIT_STATE_REQUEUED) && (
             <Button
               compact
-              size="mini"
+              size="medium"
               color="red"
               icon
               onClick={this.deleteItem.bind(this)}
@@ -3160,7 +3291,7 @@ export default class TaggerSpace extends Component {
             <Button
               title="Move HIT to Re-tagging Queue"
               compact
-              size="mini"
+              size="medium"
               color="blue"
               icon
               onClick={this.retagHit.bind(this)}
@@ -3185,7 +3316,7 @@ export default class TaggerSpace extends Component {
   showEvaluationButtons() {
     return (
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <Button.Group size="mini">
+        <Button.Group size="medium">
           <Button onClick={this.evaluateHit.bind(this, 'incorrect')} color="blue">Incorrect</Button>
           <Button.Or />
           <Button onClick={this.evaluateHit.bind(this, 'correct')} color="blue">Correct</Button>
@@ -3263,7 +3394,7 @@ export default class TaggerSpace extends Component {
         >
           <Button
             title="Previous Element"
-            size="mini"
+            size="medium"
             color="grey"
             icon
             loading={this.state.loading}
@@ -3274,7 +3405,7 @@ export default class TaggerSpace extends Component {
           </Button>
           { (this.state.changesInSession > 0 && this.state.type === HIT_STATE_DONE) && (
             <Button
-              size="mini"
+              size="medium"
               color="green"
               title="Save Changes"
               icon
@@ -3287,7 +3418,7 @@ export default class TaggerSpace extends Component {
           )}
           {this.state.type === "notDone" && (
             <Button
-              size="mini"
+              size="medium"
               color="grey"
               icon
               loading={this.state.loading}
@@ -3299,7 +3430,7 @@ export default class TaggerSpace extends Component {
           )}
           <Button
             title="Next Element"
-            size="mini"
+            size="medium"
             color="blue"
             icon
             loading={this.state.loading}
@@ -3318,13 +3449,20 @@ export default class TaggerSpace extends Component {
     let prevButton = "Previous";
     let skipButton = "Skip";
     let moveToDoneButton = "Move to Done";
+    let showNextButton = false;
+    let showPrevButton = true;
     const nextButtonDisabled =
       this.state.currentIndex < 0 ||
       (this.state.hitScrollCompleted &&
         this.state.currentIndex >= this.state.hits.length - 1);
     if ("shortcuts" in this.state) {
       const shortcuts = this.state.shortcuts;
-      if ("next" in shortcuts) {
+      // Force Mousetrap: stackoverflow.com/questions/21013866/
+      Mousetrap.prototype.stopCallback = function() {
+        return false;
+      }
+
+      if ("next" in shortcuts && showNextButton) {
         const combo = convertKeyToString(shortcuts.next);
         nextButton = "Next (" + combo + ")";
         if (!nextButtonDisabled) {
@@ -3333,7 +3471,7 @@ export default class TaggerSpace extends Component {
           Mousetrap.unbind(combo);
         }
       }
-      if ("previous" in shortcuts) {
+      if ("previous" in shortcuts && showPrevButton) {
         const combo = convertKeyToString(shortcuts.previous);
         prevButton = "Previous (" + combo + ")";
         if (this.state.currentIndex > 0) {
@@ -3375,9 +3513,10 @@ export default class TaggerSpace extends Component {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-evenly'}}>
+          { showPrevButton &&
           <div title={prevButton}>
             <Button
-              size="mini"
+              size="medium"
               color="grey"
               labelPosition="left"
               loading={this.state.loading}
@@ -3390,9 +3529,11 @@ export default class TaggerSpace extends Component {
               Previous
             </Button>
           </div>
+          }
+          { showNextButton &&
           <div title={nextButton}>
             <Button
-              size="mini"
+              size="medium"
               color="blue"
               loading={this.state.loading}
               icon
@@ -3405,11 +3546,12 @@ export default class TaggerSpace extends Component {
               <Icon name="right arrow" />
             </Button>
           </div>
+          }
         </div>
         <br />
         <div title={moveToDoneButton}>
           <Button
-            size="mini"
+            size="medium"
             color="blue"
             loading={this.state.loading}
             icon
@@ -3423,7 +3565,7 @@ export default class TaggerSpace extends Component {
         <br />
         <div title={skipButton}>
           <Button
-            size="mini"
+            size="medium"
             color="grey"
             loading={this.state.loading}
             icon
@@ -3446,8 +3588,9 @@ export default class TaggerSpace extends Component {
           padding: '0.5rem'
         }}
       >
+        { showPrevButton &&
         <Button
-          size="mini"
+          size="medium"
           color="grey"
           loading={this.state.loading}
           icon
@@ -3458,9 +3601,10 @@ export default class TaggerSpace extends Component {
           <Icon name="left arrow" />
           {prevButton}
         </Button>
+        }
         <br />
         <Button
-          size="mini"
+          size="medium"
           color="grey"
           loading={this.state.loading}
           icon
@@ -3473,7 +3617,7 @@ export default class TaggerSpace extends Component {
         </Button>
         <br />
         <Button
-          size="mini"
+          size="medium"
           color="blue"
           loading={this.state.loading}
           icon
@@ -3484,8 +3628,9 @@ export default class TaggerSpace extends Component {
           {moveToDoneButton}
         </Button>
         <br />
+        { showNextButton &&
         <Button
-          size="mini"
+          size="medium"
           color="blue"
           loading={this.state.loading}
           icon
@@ -3496,6 +3641,7 @@ export default class TaggerSpace extends Component {
           {nextButton}
           <Icon name="right arrow" />
         </Button>
+        }
       </div>
     );
   }
@@ -3604,12 +3750,16 @@ export default class TaggerSpace extends Component {
           onClick={this.handleClick}
         >
           <Icon name="dropdown" />
-          <Label size="mini" style={{ background: "#a9d5de" }}>
+          <Label size="medium" style={{ background: "#a9d5de" }}>
             Project Guidelines
           </Label>
         </Accordion.Title>
         <Accordion.Content active={activeIndex === 0}>
-          <p>{this.state.rules.instructions}</p>
+          <div
+            dangerouslySetInnerHTML={{
+              __html: this.state.rules.instructions
+            }}
+          />
         </Accordion.Content>
       </Accordion>
     );
@@ -3662,10 +3812,10 @@ export default class TaggerSpace extends Component {
             </a>
           </Popover>
         );
-      } else if (this.state.projectDetails.task_type === TEXT_CLASSIFICATION) {
+      } else if (this.state.projectDetails.task_type === TEXT_CLASSIFICATION || this.state.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER) {
         popoverTop = (
           <Popover id="popover-positioned-top" title="How to classify">
-            Click to select a class to classify the sentence. More queries?{" "}
+            Click to select a class to classify the text. More queries?{" "}
             <a href="https://dataturks.com/help/help.php" target="_blank">
               {" "}
               See Demo Videos{" "}
@@ -3908,21 +4058,21 @@ export default class TaggerSpace extends Component {
                   !this.state.hitsCompleted && (
                     <div className="text-center" style={{}}>
                       <Checkbox
-                        size="mini"
+                        size="medium"
                         checked={this.state.notes}
                         onClick={this.toggleNotes.bind(this)}
                         label="Show Notes"
                       />
                       &nbsp; &nbsp;
                       <Checkbox
-                        size="mini"
+                        size="medium"
                         checked={this.state.hideLabels}
                         onClick={this.toggleHideLabels.bind(this)}
                         label="Hide Labels"
                       />
                       &nbsp; &nbsp;
                       <Checkbox
-                        size="mini"
+                        size="medium"
                         checked={this.state.autoClose}
                         onClick={this.toggleAutoClose.bind(this)}
                         label="AutoClose"
@@ -3934,7 +4084,7 @@ export default class TaggerSpace extends Component {
                   !this.state.hitsCompleted && (
                     <div className="text-center" style={{}}>
                       <Checkbox
-                        size="mini"
+                        size="medium"
                         checked={this.state.keepEntitySelected}
                         onClick={this.toggleEntitySelected.bind(this)}
                         label="Keep Entity Selected"
@@ -3962,7 +4112,7 @@ export default class TaggerSpace extends Component {
                       &nbsp; &nbsp;
                       <Button
                         disabled={this.state.undoButton}
-                        size="mini"
+                        size="medium"
                         icon
                         onClick={() => this.docAnnotator.undo()}
                       >
@@ -3970,7 +4120,7 @@ export default class TaggerSpace extends Component {
                       </Button>
                       &nbsp; &nbsp;
                       <Button
-                        size="mini"
+                        size="medium"
                         icon
                         onClick={() => this.docAnnotator.clearAll()}
                       >
@@ -3988,7 +4138,7 @@ export default class TaggerSpace extends Component {
                           overlay={popoverTop}
                         >
                           <Icon
-                            size="mini"
+                            size="medium"
                             name="help circle"
                             color="teal"
                             size="large"
@@ -4009,7 +4159,7 @@ export default class TaggerSpace extends Component {
                           overlay={keyobardPopover}
                         >
                           <Button
-                            size="mini"
+                            size="medium"
                             icon
                             onClick={() =>
                               this.props.pushState(
@@ -4049,7 +4199,7 @@ export default class TaggerSpace extends Component {
                           >
                             <Button
                               compact
-                              size="mini"
+                              size="medium"
                               icon
                               onClick={() => {
                                 if (!this.state.fullScreen)
@@ -4164,8 +4314,7 @@ export default class TaggerSpace extends Component {
                           </div>
                         </Fullscreen>
                       )}
-                      {this.state.projectDetails.task_type ===
-                        TEXT_SUMMARIZATION && (
+                      {this.state.projectDetails.task_type === TEXT_SUMMARIZATION && (
                         <Fullscreen
                           enabled={this.state.fullScreen}
                           onChange={isFullscreenEnabled =>
@@ -4179,7 +4328,35 @@ export default class TaggerSpace extends Component {
                             {extra && <div>{this.showExtra(extra)}</div>}
                             {this.showText()}
                             <br />
-                            {this.showWriteText(TEXT_SUMMARIZATION)}
+                            {this.showWriteText(this.state.projectDetails.task_type)}
+                            {this.state.loading &&
+                              this.state.isFullscreenEnabled && (
+                                <Segment basic vertical loading />
+                              )}
+                            <div
+                              style={{ height: "20px" }}
+                              disabled={this.state.loading}
+                            />
+                            {this.state.type === "notDone" &&
+                              this.showButtons()}
+                          </div>
+                        </Fullscreen>
+                      )}
+                      {this.state.projectDetails.task_type === SENTENCE_TRANSLATION && (
+                        <Fullscreen
+                          enabled={this.state.fullScreen}
+                          onChange={isFullscreenEnabled =>
+                            this.setState({
+                              isFullscreenEnabled,
+                              fullScreen: isFullscreenEnabled
+                            })
+                          }
+                        >
+                          <div className="marginTopExtra">
+                            {extra && <div>{this.showExtra(extra)}</div>}
+                            {this.showTranslationText()}
+                            <br />
+                            {this.showWriteText(this.state.projectDetails.task_type)}
                             {this.state.loading &&
                               this.state.isFullscreenEnabled && (
                                 <Segment basic vertical loading />
@@ -4218,6 +4395,43 @@ export default class TaggerSpace extends Component {
                               {this.state.currentIndex >= 0 && showNoteLable()}
                             </div>
                             <div style={{ width: "20%" }}>
+                              {this.state.loading &&
+                                this.state.isFullscreenEnabled && (
+                                  <Segment basic vertical loading />
+                                )}
+                              {this.showClassifyTags(true, "vertical")}
+                              <br />
+                              {this.state.type === "notDone" &&
+                                this.showButtons("vertical")}
+                            </div>
+                          </div>
+                        </Fullscreen>
+                      )}
+                      {this.state.projectDetails.task_type ===
+                        SENTENCE_PAIR_CLASSIFIER && (
+                        <Fullscreen
+                          enabled={this.state.fullScreen}
+                          onChange={isFullscreenEnabled =>
+                            this.setState({
+                              isFullscreenEnabled,
+                              fullScreen: isFullscreenEnabled
+                            })
+                          }
+                        >
+                          <div
+                            className="marginTopExtra"
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between"
+                            }}
+                          >
+                            <div style={{ width: "67%" }}>
+                              {extra && <div>{this.showExtra(extra)}</div>}
+                              {this.showTextPairs()}
+                              <br />
+                              {this.state.currentIndex >= 0 && showNoteLable()}
+                            </div>
+                            <div style={{ width: "30%" }}>
                               {this.state.loading &&
                                 this.state.isFullscreenEnabled && (
                                   <Segment basic vertical loading />

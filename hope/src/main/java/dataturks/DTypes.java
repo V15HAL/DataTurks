@@ -36,7 +36,9 @@ public class DTypes {
         IMAGE_POLYGON_BOUNDING_BOX,
         IMAGE_POLYGON_BOUNDING_BOX_V2,
         VIDEO_CLASSIFICATION,
-        VIDEO_BOUNDING_BOX
+        VIDEO_BOUNDING_BOX,
+        SENTENCE_TRANSLATION,
+        SENTENCE_PAIR_CLASSIFIER,
     }
 
     public enum Project_User_Role {

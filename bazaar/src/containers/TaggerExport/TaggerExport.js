@@ -8,7 +8,7 @@ import { setCurrentProject, getProjectDetails } from 'redux/modules/dataturks';
 // import FontAwesome from 'react-fontawesome';
 import { Button, Form, Label, Segment, Icon, Breadcrumb } from 'semantic-ui-react';
 import { goBack, push } from 'react-router-redux';
-import { TEXT_SUMMARIZATION, DOCUMENT_ANNOTATION, POS_TAGGING_GENERIC, POS_TAGGING, TEXT_CLASSIFICATION, TEXT_MODERATION, IMAGE_POLYGON_BOUNDING_BOX, IMAGE_POLYGON_BOUNDING_BOX_V2, IMAGE_BOUNDING_BOX, IMAGE_CLASSIFICATION} from '../../helpers/Utils';
+import { TEXT_SUMMARIZATION, DOCUMENT_ANNOTATION, POS_TAGGING_GENERIC, POS_TAGGING, TEXT_CLASSIFICATION, TEXT_MODERATION, IMAGE_POLYGON_BOUNDING_BOX, IMAGE_POLYGON_BOUNDING_BOX_V2, IMAGE_BOUNDING_BOX, IMAGE_CLASSIFICATION, SENTENCE_TRANSLATION, SENTENCE_PAIR_CLASSIFIER} from '../../helpers/Utils';
 
 const FileSaver = require('file-saver');
 
@@ -177,6 +177,9 @@ export default class TaggerExport extends Component {
                                 { this.props.projectDetails && this.props.projectDetails.task_type === TEXT_SUMMARIZATION &&
                                 <p>Download file would be a tab seperated file with input in first column and output row in second column.</p>
                                 }
+                                { this.props.projectDetails && this.props.projectDetails.task_type === SENTENCE_TRANSLATION &&
+                                <p>Download file would be a text file where each line is a JSON containing the input text and corresponding translation.</p>
+                                }
                                 { this.props.projectDetails && this.props.projectDetails.task_type === TEXT_MODERATION &&
                                 <p>Download file would be a tab seperated file with input in first column and output row in second column.</p>
                                 }
@@ -184,6 +187,9 @@ export default class TaggerExport extends Component {
                                 <p>Download file would be a text file where each line is a JSON containing the input text and annotated text.</p>
                                 }
                                 { this.props.projectDetails && this.props.projectDetails.task_type === TEXT_CLASSIFICATION &&
+                                <p>Download file would be a text file where each line is a JSON containing the input text, associated label and notes.</p>
+                                }
+                                { this.props.projectDetails && this.props.projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER &&
                                 <p>Download file would be a text file where each line is a JSON containing the input text, associated label and notes.</p>
                                 }
                                 {

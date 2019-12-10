@@ -28,6 +28,7 @@ import {
   sendInvite,
   getUidToken,
   fetchHitsDetails,
+  getStatsForDate,
   deleteProjectDt,
   logEvent
 } from "../../helpers/dthelper";
@@ -43,12 +44,14 @@ import {
   IMAGE_POLYGON_BOUNDING_BOX_V2,
   IMAGE_BOUNDING_BOX,
   TEXT_CLASSIFICATION,
+  SENTENCE_PAIR_CLASSIFIER,
   POS_TAGGING,
   taskTypeMap,
   createEntitiesJson,
   TEXT_MODERATION,
   createDocEntityColorMap,
-  TEXT_SUMMARIZATION
+  TEXT_SUMMARIZATION,
+  SENTENCE_TRANSLATION
 } from "../../helpers/Utils";
 import { TaggerInvite } from "../../components";
 import { push } from "react-router-redux";
@@ -56,6 +59,8 @@ import Popover from "react-bootstrap/lib/Popover";
 import OverlayTrigger from "react-bootstrap/lib/OverlayTrigger";
 import Table from "react-bootstrap/lib/Table";
 import Modal from "react-bootstrap/lib/Modal";
+
+import DatePicker from "react-date-picker";
 // import OverlayTrigger from 'react-bootstrap/lib/OverlayTrigger';
 // import Tooltip from 'react-bootstrap/lib/Tooltip';
 import ReactTooltip from "react-tooltip";
@@ -67,6 +72,8 @@ import PolygonAnnotatorV2 from "../../components/PolygonAnnotatorV2/PolygonAnnot
 import PolygonAnnotatorOld from "../../components/PolygonAnnotatorOld/PolygonAnnotator";
 import DocumentAnnotator from "../../components/DocumentAnnotator/DocumentAnnotator";
 import config from "../../config";
+
+
 import {
   Player,
   ControlBar,
@@ -132,6 +139,7 @@ export default class TaggerOrgProject extends Component {
     this.projectDeleted = this.projectDeleted.bind(this);
     this.showTags = this.showTags.bind(this);
     this.deleteProject = this.deleteProject.bind(this);
+    this.dateStatsFetched = this.dateStatsFetched.bind(this);
     this.state = {
       fields: {},
       errors: {},
@@ -143,7 +151,10 @@ export default class TaggerOrgProject extends Component {
       inviteModal: false,
       loading: false,
       successModal: false,
-      selectedLabel: undefined
+      selectedLabel: undefined,
+      date: null,
+      dateStats: null,
+      dateStatsError: undefined
     };
   }
 
@@ -156,7 +167,10 @@ export default class TaggerOrgProject extends Component {
     loading: false,
     successModal: false,
     projectDetailsError: undefined,
-    hitsDetails: undefined
+    hitsDetails: undefined,
+    date: null,
+    dateStats: null,
+    dateStatsError: undefined
   };
 
   componentWillMount() {
@@ -202,6 +216,7 @@ export default class TaggerOrgProject extends Component {
         "done"
       );
     }
+    this.setInitialDate();
     // if (this.props.currentProject) {
     //   this.loadProjectDetails();
     //   fetchHitsDetails(this.props.currentProject, 0, 10, this.hitsFetched);
@@ -256,6 +271,19 @@ export default class TaggerOrgProject extends Component {
     // this.setState({ isMounted: false });
   }
 
+  onDateChange = date => {
+    this.setState({date});
+    getStatsForDate(this.props.currentProject, date, this.dateStatsFetched);
+  }
+
+  setInitialDate() {
+    const date = new Date();
+    this.setState({date: date});
+    if (this.props.currentProject) {
+    getStatsForDate(this.props.currentProject, date, this.dateStatsFetched);
+    }
+  }
+
   getContributorsData = data => {
     const arrs = [];
     console.log("getContributorsData ", data);
@@ -267,7 +295,7 @@ export default class TaggerOrgProject extends Component {
       if (data[index].hitsDone > 0 || showZero) {
         arrs.push(
           <tr key={index}>
-            <td>{data[index].userDetails.firstName}</td>
+            <td>{data[index].userDetails.firstName + " " + data[index].userDetails.secondName}</td>
             <td>{data[index].avrTimeTakenInSec}</td>
             <td>{data[index].hitsDone}</td>
           </tr>
@@ -276,6 +304,21 @@ export default class TaggerOrgProject extends Component {
     }
     return <tbody>{arrs}</tbody>;
   };
+
+  dateStatsFetched(error, response) {
+    if (!error) {
+       this.setState({
+        dateStats: response.body,
+        dateStatsError: undefined
+      });
+    } else {
+      if (response && response.body && response.body.message) {
+        this.setState({ dateStatsError: response.body.message });
+      } else {
+        this.setState({ dateStatsError: "Error in fetching data" });
+      }
+    }
+  }
 
   hitsFetched(error, response) {
     console.log("hitsFetched ", error, response);
@@ -292,6 +335,7 @@ export default class TaggerOrgProject extends Component {
       if (
         projectDetails.task_type === POS_TAGGING ||
         projectDetails.task_type === TEXT_CLASSIFICATION ||
+        projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER ||
         projectDetails.task_type === DOCUMENT_ANNOTATION ||
         projectDetails.task_type === IMAGE_POLYGON_BOUNDING_BOX ||
         projectDetails.task_type === IMAGE_POLYGON_BOUNDING_BOX_V2 ||
@@ -402,6 +446,7 @@ export default class TaggerOrgProject extends Component {
         this.setState({ projectDetailsError: "Error in fetching data" });
       }
     }
+    this.setInitialDate();
   }
 
   openInviteModal(event, data) {
@@ -573,13 +618,16 @@ export default class TaggerOrgProject extends Component {
     return <div> {renderArrs} </div>;
   }
 
-  showClassifications = hitsDetails => {
+  showClassifications = (hitsDetails, type) => {
     if (hitsDetails && hitsDetails.length === 0) {
       return <h2>No Sample HITs</h2>;
     }
     console.log("show classifications ", this.state);
     const currentHit = hitsDetails[this.state.start];
-    const data = currentHit.data;
+    let data = currentHit.data;
+    if (type === SENTENCE_PAIR_CLASSIFIER && data.split('|').length > 1) {
+      data = data.split('|')[1];
+    }
     const result = currentHit.hitResults[0].result;
     let currentTags = [];
     let currentNote = "";
@@ -1430,11 +1478,15 @@ export default class TaggerOrgProject extends Component {
     }
     console.log("show hits details ", hitsDetails);
     const currentHit = hitsDetails[this.state.start];
-    const data = currentHit.data;
+    let data = currentHit.data;
     const result = currentHit.hitResults[0].result;
     let title = "Summaries";
     if (type === TEXT_MODERATION) {
       title = "Moderated Text";
+    }
+    if (type === SENTENCE_TRANSLATION) {
+      data = data.split('|').length > 1 ? data.split('|')[1] : data;
+      title = "Translation";
     }
     return (
       <div
@@ -1956,7 +2008,7 @@ export default class TaggerOrgProject extends Component {
         )}
 
         <div style={{ height: "50px" }} />
-        {projectDetails &&
+        { projectDetails &&
           projectDetails.contributorDetails &&
           projectDetails.contributorDetails.length > 0 && (
             <div
@@ -1985,7 +2037,43 @@ export default class TaggerOrgProject extends Component {
               </Segment.Group>
             </div>
           )}
-
+        <br />
+        <br />
+        { this.state.date && (
+          <div
+            className="text-center"
+            style={{ display: "flex", justifyContent: "space-around" }}
+          >
+            <Segment.Group
+              loading={this.state.loading}
+              style={{ width: "60%" }}
+              centered
+            >
+              <Header attached="top" block as="h4">
+                <Icon name="line chart" disabled />
+                <Header.Content>Stats for the selected date
+                    <DatePicker
+                    onChange={this.onDateChange}
+                    value={this.state.date}
+                    maxDate={new Date()}
+                    />
+                </Header.Content>
+              </Header>
+              { this.state.dateStats && (
+              <Table striped bordered condensed hover responsive>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Time(s) / HIT</th>
+                    <th>#HITs done</th>
+                  </tr>
+                </thead>
+                {this.getContributorsData(this.state.dateStats)}
+              </Table>
+              )}
+            </Segment.Group>
+          </div>
+        )}
         <br />
         <br />
 
@@ -2008,7 +2096,7 @@ export default class TaggerOrgProject extends Component {
         {projectDetails &&
           hitsDetails &&
           hitsDetails.length > 0 &&
-          projectDetails.task_type === TEXT_SUMMARIZATION && (
+          (projectDetails.task_type === TEXT_SUMMARIZATION || projectDetails.task_type === SENTENCE_TRANSLATION) && (
             <Segment.Group>
               <Header attached="top" block as="h4">
                 <Icon name="list" disabled />
@@ -2016,7 +2104,7 @@ export default class TaggerOrgProject extends Component {
               </Header>
               <Segment padded>
                 {extra && <div>{this.showExtra(extra)}</div>}
-                {this.showSummaries(hitsDetails, TEXT_SUMMARIZATION)}
+                {this.showSummaries(hitsDetails, projectDetails.task_type)}
               </Segment>
             </Segment.Group>
           )}
@@ -2031,14 +2119,14 @@ export default class TaggerOrgProject extends Component {
               </Header>
               <Segment padded>
                 {extra && <div>{this.showExtra(extra)}</div>}
-                {this.showSummaries(hitsDetails, TEXT_MODERATION)}
+                {this.showSummaries(hitsDetails, projectDetails.task_type)}
               </Segment>
             </Segment.Group>
           )}
         {projectDetails &&
           hitsDetails &&
           hitsDetails.length >= 0 &&
-          projectDetails.task_type === TEXT_CLASSIFICATION && (
+          (projectDetails.task_type === TEXT_CLASSIFICATION || projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER) && (
             <Segment.Group>
               <Header attached="top" block as="h4">
                 <Icon name="list" disabled />
@@ -2050,7 +2138,7 @@ export default class TaggerOrgProject extends Component {
                 <br />
                 {extra && <div>{this.showExtra(extra)}</div>}
                 <br />
-                {this.showClassifications(hitsDetails)}
+                {this.showClassifications(hitsDetails, projectDetails.task_type)}
               </Segment>
             </Segment.Group>
           )}

@@ -9,7 +9,7 @@ import { fetchHitsDetails, getUidToken, addHits } from '../../helpers/dthelper';
 import { push, goBack } from 'react-router-redux';
 import { Table, Label, Dropdown, Button, Icon, Divider, Segment, Breadcrumb } from 'semantic-ui-react';
 
-import { getDetaultShortcuts, checkVideoURL, convertKeyToString, VIDEO_CLASSIFICATION, VIDEO_BOUNDING_BOX, IMAGE_CLASSIFICATION, POS_TAGGING_GENERIC, DOCUMENT_ANNOTATION, IMAGE_POLYGON_BOUNDING_BOX, IMAGE_POLYGON_BOUNDING_BOX_V2, IMAGE_BOUNDING_BOX, createEntitiesJson, createDocEntityColorMap, TEXT_MODERATION, POS_TAGGING, TEXT_SUMMARIZATION, TEXT_CLASSIFICATION } from '../../helpers/Utils';
+import { getDefaultShortcuts, checkVideoURL, convertKeyToString, VIDEO_CLASSIFICATION, VIDEO_BOUNDING_BOX, IMAGE_CLASSIFICATION, POS_TAGGING_GENERIC, DOCUMENT_ANNOTATION, IMAGE_POLYGON_BOUNDING_BOX, IMAGE_POLYGON_BOUNDING_BOX_V2, IMAGE_BOUNDING_BOX, createEntitiesJson, createDocEntityColorMap, TEXT_MODERATION, POS_TAGGING, TEXT_SUMMARIZATION, TEXT_CLASSIFICATION, SENTENCE_TRANSLATION, SENTENCE_PAIR_CLASSIFIER } from '../../helpers/Utils';
 import BoxAnnotator from '../../components/BoxAnnotator/BoxAnnotator';
 import BoxAnnotatorOld from '../../components/BoxAnnotatorOld/BoxAnnotator';
 import PolygonAnnotator from '../../components/PolygonAnnotator/PolygonAnnotator';
@@ -233,14 +233,14 @@ export default class TaggerOveriew extends Component {
       let entityColorMap = {};
       if (projectDetails.task_type === POS_TAGGING ||
        projectDetails.task_type === IMAGE_BOUNDING_BOX || projectDetails.task_type === IMAGE_POLYGON_BOUNDING_BOX ||
-        projectDetails.task_type === TEXT_CLASSIFICATION || projectDetails.task_type === IMAGE_CLASSIFICATION || projectDetails.task_type === VIDEO_CLASSIFICATION ||
+        projectDetails.task_type === TEXT_CLASSIFICATION || projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER || projectDetails.task_type === IMAGE_CLASSIFICATION || projectDetails.task_type === VIDEO_CLASSIFICATION ||
         projectDetails.task_type === DOCUMENT_ANNOTATION || projectDetails.task_type === POS_TAGGING_GENERIC ||
         projectDetails.task_type === IMAGE_POLYGON_BOUNDING_BOX_V2 || projectDetails.task_type === VIDEO_BOUNDING_BOX) {
         entities = createEntitiesJson(projectDetails.taskRules).entities;
         entityColorMap = createDocEntityColorMap(entities);
       }
       const rules = JSON.parse(projectDetails.taskRules);
-      let shortcuts = getDetaultShortcuts(projectDetails.task_type, entities);
+      let shortcuts = getDefaultShortcuts(projectDetails.task_type, entities);
       if ('shortcuts' in rules) {
         shortcuts = rules.shortcuts;
       }
@@ -494,7 +494,7 @@ moveToDone() {
     timeTakenToLabelInSec = currentHit.hitResults[0].timeTakenToLabelInSec;
   }
   this.setState({ loading: true });
-  addHits(currentHit.id, { result, timeTakenToLabelInSec }, this.props.currentProject, this.hitAddCallback);
+  addHits(currentHit.id, { result: result, timeTakenToLabelInSec: timeTakenToLabelInSec, status: "done" }, this.props.currentProject, this.hitAddCallback);
   // if (this.state.type === 'skipped') {
   //   url = '/projects/' + this.props.params.orgName + '/' + this.props.params.projectName + '/space?type=skipped';
   // } else {
@@ -1019,6 +1019,11 @@ showClassificationImages = (hitsDetails) => {
        <h2>No Sample HITs</h2>
      );
    }
+   if (this.state.projectDetails.task_type === SENTENCE_TRANSLATION) {
+    return (
+      <h2>No Sample HITs</h2>
+    );
+   }
    console.log('show hits details ', hitsDetails);
    const currentHit = hitsDetails[this.state.start];
    const data = currentHit.data;
@@ -1166,7 +1171,7 @@ showClassificationImages = (hitsDetails) => {
                   }
 
                   {
-                    (projectDetails.task_type === TEXT_SUMMARIZATION || projectDetails.task_type === TEXT_MODERATION) &&
+                    (projectDetails.task_type === TEXT_SUMMARIZATION || projectDetails.task_type === TEXT_MODERATION || projectDetails.task_type === SENTENCE_TRANSLATION) &&
                     hitsDetails && hitsDetails.length > 0 &&
                     <div style={{ paddingBottom: '5%'}}>
                                       { extra &&
@@ -1178,7 +1183,7 @@ showClassificationImages = (hitsDetails) => {
                     </div>
                   }
                   {
-                    (projectDetails.task_type === TEXT_CLASSIFICATION) && hitsDetails && hitsDetails.length >= 0 &&
+                    (projectDetails.task_type === TEXT_CLASSIFICATION || projectDetails.task_type === SENTENCE_PAIR_CLASSIFIER) && hitsDetails && hitsDetails.length >= 0 &&
                     <div style={{ paddingBottom: '5%' }}>
                       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-around'}}>
                         <div>

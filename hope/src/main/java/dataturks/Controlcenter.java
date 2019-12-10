@@ -1,10 +1,10 @@
 package dataturks;
 
-
 import bonsai.Utils.UploadFileUtil;
 import bonsai.config.AppConfig;
 import bonsai.config.DBBasedConfigs;
 import bonsai.dropwizard.dao.d.*;
+import bonsai.dropwizard.resources.DataturksEndpoint.DummyResponse;
 import bonsai.email.EmailSender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +21,10 @@ import ucar.nc2.grib.TimeCoordUnion;
 import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
+
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 
@@ -154,8 +158,14 @@ public class Controlcenter {
                         case TEXT_CLASSIFICATION:
                             response = DataUploadHandler.handleTextClassification(reqObj,  project, filePath);
                             break;
+                        case SENTENCE_PAIR_CLASSIFIER:
+                            response = DataUploadHandler.handleTextPairClassification(reqObj,  project, filePath);
+                            break;
                         case TEXT_SUMMARIZATION:
                             response = DataUploadHandler.handleTextSummarization(reqObj,  project, filePath);
+                            break;
+                        case SENTENCE_TRANSLATION:
+                            response = DataUploadHandler.handleSentenceTranslation(reqObj,  project, filePath);
                             break;
                         case TEXT_MODERATION:
                             response = DataUploadHandler.handleTextModeration(reqObj,  project, filePath);
@@ -199,6 +209,18 @@ public class Controlcenter {
         return null;
     }
 
+    public static DummyResponse handleDownSyncReset(DReqObj reqObj, String projectId, long timestamp_since) {
+        if (projectId != null) {
+            DProjects project = AppConfig.getInstance().getdProjectsDAO().findByIdInternal(projectId);
+            if (project == null) {
+                throw new WebApplicationException("No such project found", Response.Status.NOT_FOUND);
+            }
+            canUserWriteProjectElseThrowException(reqObj, project);
+            DataDownloadHandler.handleDownSyncReset(reqObj, project, timestamp_since);
+        }
+        return DummyResponse.getOk();
+    }
+
     //copy the data in a local file and return file path
     public static String handleDataDownload(DReqObj reqObj, String projectId, DTypes.File_Download_Type downloadType, DTypes.File_Download_Format format) {
         if (projectId != null) {
@@ -221,8 +243,14 @@ public class Controlcenter {
                     case TEXT_CLASSIFICATION:
                         filePath = DataDownloadHandler.handleTextClassification(reqObj,  project, downloadType);
                         break;
+                    case SENTENCE_PAIR_CLASSIFIER:
+                        filePath = DataDownloadHandler.handleTextPairClassification(reqObj,  project, downloadType);
+                        break;
                     case TEXT_SUMMARIZATION:
                         filePath = DataDownloadHandler.handleTextSummarization(reqObj,  project, downloadType);
+                        break;
+                    case SENTENCE_TRANSLATION:
+                        filePath = DataDownloadHandler.handleTextTranslation(reqObj,  project, downloadType);
                         break;
                     case TEXT_MODERATION:
                         filePath = DataDownloadHandler.handleTextModeration(reqObj,  project, downloadType);
@@ -458,6 +486,7 @@ public class Controlcenter {
                     hitStatus = DConstants.HIT_STATUS_SKIPPED;
                 }
                 else {
+                    // TODO: If 'prev' or 'next' is pressed, don't mark as done?
                     hitStatus = DConstants.HIT_STATUS_DONE;
                 }
             }
@@ -482,6 +511,7 @@ public class Controlcenter {
                 result.setUserId(reqObj.getUid());
                 result.setResult(reqObj.getReqMap().get("result"));
                 result.setNotes(reqObj.getReqMap().get("notes"));
+                result.setSentViaAPI(false); //Maybe the user has updated it by clicking 'prev'
                 try {
                     int time = 0;
                     if (reqObj.getReqMap().containsKey("timeTakenToLabelInSec")) {
@@ -609,7 +639,13 @@ public class Controlcenter {
             case TEXT_CLASSIFICATION:
                 stats = StatsHandler.handleTextClassification(reqObj, project);
                 break;
+            case SENTENCE_PAIR_CLASSIFIER:
+                stats = StatsHandler.handleTextClassification(reqObj, project);
+                break;
             case TEXT_SUMMARIZATION:
+                stats = StatsHandler.handleTextSummarization(reqObj, project);
+                break;
+            case SENTENCE_TRANSLATION: //TODO_SENTENCE_TRANSLATION
                 stats = StatsHandler.handleTextSummarization(reqObj, project);
                 break;
             case TEXT_MODERATION:
@@ -1200,8 +1236,6 @@ public class Controlcenter {
                         }
                     }
                 }
-
-                details.addContributorDetails(contributorDetails);
             }
         }
 
@@ -1219,7 +1253,7 @@ public class Controlcenter {
                 }
             }
         }
-
+        addContributorStatsPerDay(projectUsers, results, details);
     }
 
     // don't show user email etc to non-contributors.
@@ -1292,5 +1326,75 @@ public class Controlcenter {
         user.setUpdated_timestamp(new Date());
         AppConfig.getInstance().getdUsersDAO().saveOrUpdateInternal(user);
     }
+    public static List<ContributorDetails> fetchProjectStatsForDateInternal(String projectId, String date) {
+        DProjects project = AppConfig.getInstance().getdProjectsDAO().findByIdInternal(projectId);
+        if (project == null) {
+            throw new WebApplicationException("No such project found", Response.Status.NOT_FOUND);
+        }
+        List<DHitsResult> results = AppConfig.getInstance().getdHitsResultDAO()
+                .findAllByProjectIdInternal(project.getId());
+        List<DProjectUsers> projectUsers = AppConfig.getInstance().getdProjectUsersDAO()
+                .findAllByProjectIdInternal(project.getId());
 
+        return fetchProjectStatsForDate(results, projectUsers, date);
+    }
+
+    public static List<ContributorDetails> fetchProjectStatsForDate(List<DHitsResult> results,
+            List<DProjectUsers> projectUsers, String inpDate) {
+        SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy");
+        String strDate = "";
+        try {
+            strDate = formatter.format(formatter.parse(inpDate));
+
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        Map<String, List<DHitsResult>> contributorsMapForDate = new HashMap<>();
+        List<ContributorDetails> detailsForDate = new ArrayList<ContributorDetails>();
+        for (DHitsResult result : results) {
+
+            String date = formatter.format(result.getUpdated_timestamp());
+            if (date.equals(strDate)) {
+                if (!contributorsMapForDate.containsKey(result.getUserId())) {
+                    contributorsMapForDate.put(result.getUserId(), new ArrayList<>());
+                }
+                contributorsMapForDate.get(result.getUserId()).add(result);
+            }
+        }
+        contributorsMapForDate = sortByHitsDone(contributorsMapForDate);
+        for (String userId : contributorsMapForDate.keySet()) {
+            DUsers user = AppConfig.getInstance().getdUsersDAO().findByIdInternal(userId);
+            List<DHitsResult> userHits = contributorsMapForDate.get(userId);
+
+            ContributorDetails contributorDetails = new ContributorDetails(new UserDetails(user));
+            contributorDetails.setHitsDone(userHits.size());
+            contributorDetails.setAvrTimeTakenInSec(getAvrgTimePerHit(userHits));
+
+            // get user role.
+            if (projectUsers != null) {
+                for (DProjectUsers projectUser : projectUsers) {
+                    if (projectUser.getUserId().equalsIgnoreCase(userId)) {
+                        contributorDetails.setRole(projectUser.getRole());
+                    }
+                }
+            }
+            detailsForDate.add(contributorDetails);
+        }
+        // also add contributors who might have 0 hits.
+        if (projectUsers != null) {
+            for (DProjectUsers projectUser : projectUsers) {
+                if (!contributorsMapForDate.containsKey(projectUser.getUserId())) {
+                    DUsers user = AppConfig.getInstance().getdUsersDAO().findByIdInternal(projectUser.getUserId());
+                    if (user == null) {
+                        continue;
+                    }
+                    ContributorDetails contributorDetails = new ContributorDetails(new UserDetails(user));
+                    contributorDetails.setRole(projectUser.getRole());
+                    detailsForDate.add(contributorDetails);
+                }
+            }
+           
+        }
+        return detailsForDate;
+    }
 }

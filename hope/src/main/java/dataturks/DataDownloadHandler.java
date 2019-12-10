@@ -7,6 +7,8 @@ import bonsai.config.DBBasedConfigs;
 import bonsai.dropwizard.dao.d.DHits;
 import bonsai.dropwizard.dao.d.DHitsResult;
 import bonsai.dropwizard.dao.d.DProjects;
+import bonsai.dropwizard.resources.DataturksEndpoint.DummyResponse;
+
 import com.fasterxml.jackson.core.io.JsonStringEncoder;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,6 +28,36 @@ public class DataDownloadHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(DataDownloadHandler.class);
 
+    static Map<Long, DHitsResult> getHitId2ResultMap(DReqObj reqObj, DProjects project) {
+        List<DHitsResult> results = AppConfig.getInstance().getdHitsResultDAO().findAllByProjectIdInternal(project.getId());
+        Map<Long, DHitsResult> hitsResultMap = new HashMap<>();
+        final boolean syncMode = (reqObj.getReqMap() != null && reqObj.getReqMap().containsKey("isDownSync"));
+
+        for (DHitsResult result : results) {
+            if (syncMode) { 
+                if (result.getSentViaAPI()) continue; // Ignore results already sent
+                result.setSentViaAPI(true); // Mark this HitsResult as sent via API
+                AppConfig.getInstance().getdHitsResultDAO().saveOrUpdateInternal(result);
+            }
+            hitsResultMap.put(result.getHitId(), result);
+        }
+
+        return hitsResultMap;
+    }
+
+    public static DummyResponse handleDownSyncReset(DReqObj reqObj, DProjects project, long timestamp_since) {
+        List<DHitsResult> results = AppConfig.getInstance().getdHitsResultDAO().findAllByProjectIdInternal(project.getId());
+        java.util.Date timestamp = new java.util.Date(timestamp_since*1000L);
+
+        for (DHitsResult result : results) {
+            if (result.getSentViaAPI() && result.getUpdated_timestamp().after(timestamp)) {
+                result.setSentViaAPI(false);
+                AppConfig.getInstance().getdHitsResultDAO().saveOrUpdateInternal(result);
+            }
+        }
+        return DummyResponse.getOk();
+    }
+
     public static String handlePOSTagging(DReqObj reqObj, DProjects project, DTypes.File_Download_Type downloadType,  DTypes.File_Download_Format format) {
         return handlePOSTypes(reqObj, project, downloadType, format);
     }
@@ -38,8 +70,16 @@ public class DataDownloadHandler {
         return handleJsonDownload(reqObj, project, downloadType);
     }
 
+    public static String handleTextPairClassification(DReqObj reqObj, DProjects project, DTypes.File_Download_Type downloadType) {
+        return handleJsonDownload(reqObj, project, downloadType);
+    }
+
     public static String handleTextSummarization(DReqObj reqObj, DProjects project, DTypes.File_Download_Type downloadType) {
         return handleForTextTypes(reqObj, project, downloadType);
+    }
+
+    public static String handleTextTranslation(DReqObj reqObj, DProjects project, DTypes.File_Download_Type downloadType) {
+        return handleJsonDownload(reqObj, project, downloadType);
     }
 
     public static String handleTextModeration(DReqObj reqObj, DProjects project, DTypes.File_Download_Type downloadType) {
@@ -93,12 +133,7 @@ public class DataDownloadHandler {
     private static String handleForTextTypes(DReqObj reqObj, DProjects project, DTypes.File_Download_Type downloadType) {
 
         List<DHits> hits = AppConfig.getInstance().getdHitsDAO().findAllByProjectIdInternal(project.getId());
-        List<DHitsResult> results = AppConfig.getInstance().getdHitsResultDAO().findAllByProjectIdInternal(project.getId());
-
-        Map<Long, DHitsResult> hitsResultMap = new HashMap<>();
-        for (DHitsResult result : results) {
-            hitsResultMap.put(result.getHitId(), result);
-        }
+        Map<Long, DHitsResult> hitsResultMap = getHitId2ResultMap(reqObj, project);
 
         List<String> lines = new ArrayList<>();
         lines.add("input"+ DConstants.TEXT_INPUT_RESULT_SEPARATOR  + "result");
@@ -122,12 +157,7 @@ public class DataDownloadHandler {
 
     private static String handleJsonDownload(DReqObj reqObj, DProjects project, DTypes.File_Download_Type downloadType) {
         List<DHits> hits = AppConfig.getInstance().getdHitsDAO().findAllByProjectIdInternal(project.getId());
-        List<DHitsResult> results = AppConfig.getInstance().getdHitsResultDAO().findAllByProjectIdInternal(project.getId());
-
-        Map<Long, DHitsResult> hitsResultMap = new HashMap<>();
-        for (DHitsResult result : results) {
-            hitsResultMap.put(result.getHitId(), result);
-        }
+        Map<Long, DHitsResult> hitsResultMap = getHitId2ResultMap(reqObj, project);
         List<String> lines = new ArrayList<>();
 
         boolean isPaidProject = Validations.isPaidPlanProject(project);
@@ -151,17 +181,22 @@ public class DataDownloadHandler {
         String resultJson = result != null ? result.getResult() : "";
         //for image classification, old hit results may not have a wellformed json in result
         // fix that.
-        if (DTypes.Project_Task_Type.IMAGE_CLASSIFICATION == project.getTaskType()) {
-            resultJson = DataDownloadHelper.fixImageClassificationResultJson(resultJson);
+        switch(project.getTaskType()) {
+            case IMAGE_CLASSIFICATION:
+            case TEXT_CLASSIFICATION:
+            case SENTENCE_PAIR_CLASSIFIER:
+                resultJson = DataDownloadHelper.fixImageClassificationResultJson(resultJson);
+                break;
+            case POS_TAGGING:
+                resultJson = DataDownloadHelper.convertPoSToJson(resultJson);
+                break;
+            case TEXT_SUMMARIZATION:
+            case SENTENCE_TRANSLATION:
+            case TEXT_MODERATION:
+                resultJson = "\"" + DataDownloadHelper.getStringJsonEscaped(resultJson) + "\"";
+                break;
         }
-        else if (DTypes.Project_Task_Type.TEXT_CLASSIFICATION == project.getTaskType()) {
-            resultJson = DataDownloadHelper.fixImageClassificationResultJson(resultJson);
-        }
-        else if (DTypes.Project_Task_Type.POS_TAGGING == project.getTaskType()) {
-            resultJson = DataDownloadHelper.convertPoSToJson(resultJson);
-        }
-
-
+        
         return DataDownloadHelper.formatAsJson(hit, result, resultJson, isPaidPlanProject);
     }
 

@@ -90,7 +90,9 @@ export const DUMMY_UID = "123";
 export const DUMMY_TOKEN = "11111";
 export const POS_TAGGING = "POS_TAGGING";
 export const TEXT_SUMMARIZATION = "TEXT_SUMMARIZATION";
+export const SENTENCE_TRANSLATION = 'SENTENCE_TRANSLATION';
 export const TEXT_CLASSIFICATION = "TEXT_CLASSIFICATION";
+export const SENTENCE_PAIR_CLASSIFIER = "SENTENCE_PAIR_CLASSIFIER";
 export const VIDEO_CLASSIFICATION = "VIDEO_CLASSIFICATION";
 export const TEXT_MODERATION = "TEXT_MODERATION";
 export const IMAGE_SEGMENTATION = "IMAGE_SEGMENTATION";
@@ -126,7 +128,9 @@ export const hitStateNameMap = {
 export const nameTypeMap = {
   POS_TAGGING: "POS_TAGGING",
   TEXT_SUMMARIZATION: "TEXT_SUMMARIZATION",
+  SENTENCE_TRANSLATION: "SENTENCE_TRANSLATION",
   TEXT_CLASSIFICATION: "TEXT_CLASSIFICATION",
+  SENTENCE_PAIR_CLASSIFIER: "SENTENCE_PAIR_CLASSIFIER",
   TEXT_MODERATION: "TEXT_MODERATION",
   IMAGE_BOUNDING_BOX: "IMAGE_BOUNDING_BOX",
   IMAGE_CLASSIFICATION: "IMAGE_CLASSIFICATION",
@@ -170,7 +174,9 @@ export const taskTypeMap = {
   IMAGE_SEGMENTATION: "Image Segmentation",
   POS_TAGGING: "Part of Speech Tagging: Small Sentences",
   TEXT_SUMMARIZATION: "Text Summarization",
+  SENTENCE_TRANSLATION: "Text Translation",
   TEXT_CLASSIFICATION: "Text Classification",
+  SENTENCE_PAIR_CLASSIFIER: "Text Pair Classification",
   TEXT_MODERATION: "Text Moderation"
 };
 
@@ -308,10 +314,10 @@ export const createEntitiesJson = ruleLine => {
 };
 
 
-export const getDetaultShortcuts = (type, entities) => {
+export const getDefaultShortcuts = (type, entities) => {
   const commonKeys = {
-    next: { qualifier: "", key: "right" },
-    previous: { qualifier: "", key: "left" },
+    next: { qualifier: "ctrl", key: "." },
+    previous: { qualifier: "ctrl", key: "," },
     skip: { qualifier: "ctrl", key: "q" },
     moveToDone: { qualifier: "ctrl", key: "enter" }
   };

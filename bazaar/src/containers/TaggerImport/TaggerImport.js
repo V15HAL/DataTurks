@@ -6,7 +6,7 @@ import { uploadDataForm, updateFileUploadStats, selectProject, updateHomeData, g
 import { uploadFileDT, getUidToken, getHomeData, logEvent } from '../../helpers/dthelper';
 import { push } from 'react-router-redux';
 import { posSample, imageBoundingSample, imagePolyBoundingSample, textClassificationJsonSample } from '../../helpers/Utils';
-import { VIDEO_CLASSIFICATION, VIDEO_BOUNDING_BOX, IMAGE_CLASSIFICATION, DOCUMENT_ANNOTATION, TEXT_SUMMARIZATION, IMAGE_POLYGON_BOUNDING_BOX, IMAGE_POLYGON_BOUNDING_BOX_V2, POS_TAGGING, POS_TAGGING_GENERIC, TEXT_CLASSIFICATION, TEXT_MODERATION, IMAGE_BOUNDING_BOX } from '../../helpers/Utils';
+import { VIDEO_CLASSIFICATION, VIDEO_BOUNDING_BOX, IMAGE_CLASSIFICATION, DOCUMENT_ANNOTATION, TEXT_SUMMARIZATION, IMAGE_POLYGON_BOUNDING_BOX, IMAGE_POLYGON_BOUNDING_BOX_V2, POS_TAGGING, POS_TAGGING_GENERIC, TEXT_CLASSIFICATION, TEXT_MODERATION, IMAGE_BOUNDING_BOX, SENTENCE_TRANSLATION, SENTENCE_PAIR_CLASSIFIER } from '../../helpers/Utils';
 // import { GoogleLogin } from 'react-google-login';
 // import FontAwesome from 'react-fontawesome';
 import { Checkbox, Button, Label, Icon, Form, Divider, Card, Statistic, Input, Segment, Progress, Accordion, Menu } from 'semantic-ui-react';
@@ -185,10 +185,10 @@ export default class TaggerImport extends Component {
       console.log('project already created, upload file');
       logEvent('buttons', 'file uploading');
       if (this.state.uploadType === 'Pre-Annotated') {
-        if (this.props.location.query.type === TEXT_SUMMARIZATION || this.props.location.query.type === TEXT_MODERATION || this.props.location.query.type === VIDEO_CLASSIFICATION
+        if (this.props.location.query.type === TEXT_SUMMARIZATION || this.props.location.query.type === SENTENCE_TRANSLATION || this.props.location.query.type === TEXT_MODERATION || this.props.location.query.type === VIDEO_CLASSIFICATION
           || this.props.location.query.type === IMAGE_CLASSIFICATION) {
           uploadFileDT(this.state.file, this.props.currentProject, this.fileUploaded, this.fileUploadProgressCallback, 'PRE_TAGGED_TSV');
-        }  else if (this.props.location.query.type === TEXT_CLASSIFICATION) {
+        }  else if (this.props.location.query.type === TEXT_CLASSIFICATION || this.props.location.query.type === SENTENCE_PAIR_CLASSIFIER) {
           let format = 'PRE_TAGGED_TSV';
           if (this.state.selectedFormat && this.state.selectedFormat === 'json') {
             format = 'PRE_TAGGED_JSON';
@@ -278,10 +278,10 @@ export default class TaggerImport extends Component {
     console.log('TaggerImport props are ', this.props, this.state, Object.keys(this.state.fields).length);
     const type = this.props.location.query.type;
     let submitDisabled = true;
-    if ((type === POS_TAGGING || type === POS_TAGGING_GENERIC || type === TEXT_CLASSIFICATION || type === DOCUMENT_ANNOTATION || type === IMAGE_CLASSIFICATION || type === IMAGE_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX || type === VIDEO_CLASSIFICATION || type === VIDEO_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX_V2) &&
+    if ((type === POS_TAGGING || type === POS_TAGGING_GENERIC || type === TEXT_CLASSIFICATION || type === SENTENCE_PAIR_CLASSIFIER || type === DOCUMENT_ANNOTATION || type === IMAGE_CLASSIFICATION || type === IMAGE_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX || type === VIDEO_CLASSIFICATION || type === VIDEO_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX_V2) &&
     ((Object.keys(this.state.fields).length === 6 || (this.state.file)) && !this.state.loading)) {
       submitDisabled = false;
-    } else if ((type === TEXT_SUMMARIZATION || type === TEXT_MODERATION) && ((Object.keys(this.state.fields).length === 5 || (this.state.file)) && !this.state.loading)) {
+    } else if ((type === TEXT_SUMMARIZATION || type === TEXT_MODERATION || type === SENTENCE_TRANSLATION) && ((Object.keys(this.state.fields).length === 5 || (this.state.file)) && !this.state.loading)) {
       submitDisabled = false;
     }
     if (!submitDisabled && (this.state.fields.project_name && this.state.fields.project_name.length === 0)) {
@@ -301,7 +301,7 @@ export default class TaggerImport extends Component {
     const styles = require('./TaggerImport.scss');
     const inputWidth = { width: '50%'};
     let placeholder = 'Tagging guidelines for your team. Ex: Mark all place names as City';
-    if (type === TEXT_CLASSIFICATION || type === IMAGE_CLASSIFICATION || type === VIDEO_CLASSIFICATION) {
+    if (type === TEXT_CLASSIFICATION || type === SENTENCE_PAIR_CLASSIFIER || type === IMAGE_CLASSIFICATION || type === VIDEO_CLASSIFICATION) {
       placeholder = 'Classification guidelines for your team. Ex: Mark all 1 star review as negative';
     } else if (type === IMAGE_BOUNDING_BOX || type === VIDEO_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX_V2) {
       placeholder = 'Bounding guidelines for your team. Ex: Create rectangles around cars';
@@ -330,11 +330,17 @@ export default class TaggerImport extends Component {
       case TEXT_CLASSIFICATION:
         namePlaceHolder = 'Emotion Detection Dataset using tweets';
         break;
+      case SENTENCE_PAIR_CLASSIFIER:
+        namePlaceHolder = 'Sentence Translations Quality Check Dataset';
+        break;
       case TEXT_MODERATION:
         namePlaceHolder = 'Violent Content Moderation Dataset';
         break;
       case TEXT_SUMMARIZATION:
         namePlaceHolder = 'Resume Summarization Dataset';
+        break;
+      case SENTENCE_TRANSLATION:
+        namePlaceHolder = 'English to Hebrew Translation Dataset';
         break;
     }
     const docOptions = (
@@ -436,12 +442,20 @@ export default class TaggerImport extends Component {
                                         'Summarize Text'
                                       }
                                       {
+                                        type === SENTENCE_TRANSLATION &&
+                                        'Translate Sentences'
+                                      }
+                                      {
                                         type === TEXT_MODERATION &&
                                         'Moderate Text'
                                       }
                                       {
                                         type === TEXT_CLASSIFICATION &&
                                         'Classify Text'
+                                      }
+                                      {
+                                        type === SENTENCE_PAIR_CLASSIFIER &&
+                                        'Classify Text Pairs'
                                       }
                                       {
                                         type === IMAGE_CLASSIFICATION &&
@@ -476,7 +490,7 @@ export default class TaggerImport extends Component {
                                     <Form.Input style={inputWidth} id="project_name" size="small" color="teal" compact onChange={this.handleChange.bind(this, 'project_name')} label="Dataset Name" control="input" type="text" value={this.state.fields.project_name} placeholder={namePlaceHolder} />
                                 <br />
 
-                                    { (type === IMAGE_CLASSIFICATION || type === VIDEO_CLASSIFICATION || type === POS_TAGGING || type === DOCUMENT_ANNOTATION || type === POS_TAGGING_GENERIC ||  type === TEXT_CLASSIFICATION || type === IMAGE_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX_V2 || type === VIDEO_BOUNDING_BOX) &&
+                                    { (type === IMAGE_CLASSIFICATION || type === VIDEO_CLASSIFICATION || type === POS_TAGGING || type === DOCUMENT_ANNOTATION || type === POS_TAGGING_GENERIC ||  type === TEXT_CLASSIFICATION || type === SENTENCE_PAIR_CLASSIFIER || type === IMAGE_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX || type === IMAGE_POLYGON_BOUNDING_BOX_V2 || type === VIDEO_BOUNDING_BOX) &&
                                       <div>
                                         { !this.state.advancedTags &&
                                           <div>
@@ -706,7 +720,7 @@ export default class TaggerImport extends Component {
                                 </div>
                                 }
                                 {
-                                 (type === TEXT_SUMMARIZATION || type === TEXT_MODERATION) &&
+                                 (type === TEXT_SUMMARIZATION || type === TEXT_MODERATION || type === SENTENCE_TRANSLATION) &&
                                  <div>
                                     <p>
                                     Please upload a text file with each line in file having input sentence in following tab seperated format.
@@ -725,7 +739,7 @@ export default class TaggerImport extends Component {
                                       </p>
                                 </div>
                               }
-                              { type === TEXT_CLASSIFICATION &&
+                              { (type === TEXT_CLASSIFICATION || type === SENTENCE_PAIR_CLASSIFIER) &&
                                 <Form>
                                   <Form.Field>
                                     Selected value: <b>{this.state.value}</b>
@@ -752,7 +766,8 @@ export default class TaggerImport extends Component {
                                     </Form.Field>
                                 </Form>
                               }
-                              { type === TEXT_CLASSIFICATION && this.state.selectedFormat === 'json' &&
+                              { (type === TEXT_CLASSIFICATION || type === SENTENCE_PAIR_CLASSIFIER) &&
+                              this.state.selectedFormat === 'json' &&
                               <p>
                               Please upload a text file with each line in file having input sentence in json format.
                               This is same as download format from dataturks
@@ -763,7 +778,8 @@ export default class TaggerImport extends Component {
 
                               </p>
                               }
-                              { type === TEXT_CLASSIFICATION && this.state.selectedFormat === 'tsv' &&
+                              { (type === TEXT_CLASSIFICATION || type === SENTENCE_PAIR_CLASSIFIER) &&
+                              this.state.selectedFormat === 'tsv' &&
                               <p>
                               Please upload a text file with each line in file having input sentence in following tab seperated format.
                                Max size 10MB
@@ -836,26 +852,6 @@ export default class TaggerImport extends Component {
 
                                 </p>
                                 }
-                              {
-                                 type === TEXT_SUMMARIZATION &&
-                                 <div>
-                                    <p>
-                                    Please upload a text file with each line in file having input sentence in following tab seperated format.
-                                     Max size 10MB
-                                <pre>
-                                  Text Line           Result Text     Extra KeyValue Pair1(optional)    Extra KeyValue Pair1(optional)
-
-
-                                  AFP - India's Tata Iron and Steel Company Ltd.      Tata Iron and Steel Company.    id=1  content=games
-
-                                  British Foreign Minister         UK Foreign Minister id=2  content=UK  site=34
-
-                                  Japan carmaker Toyota         Japanese carmaker Toyota    id=100
-                                </pre>
-                                    <b>Content</b> contains input text, <b>annotation</b> has the labeled content, <b>extras</b> is for some extra columns that you want to show with each row.
-                                      </p>
-                                </div>
-                                }
                                <div className="col-md-5" />
                                 <div className="col-md-3 text-center" style={inputWidth}>
                                 <form encType="multipart/form-data" action="" key="importFile" className="text-center">
@@ -905,6 +901,13 @@ export default class TaggerImport extends Component {
                                                            <strong> OR </strong> <br />
                                     A zip file of all the text documents to be summarized. Max file size is 100 MB for free plans</p>
                                 }
+                                { type === SENTENCE_TRANSLATION &&
+                                    <p>Please upload a text file with each line in file having sentence to be translated.<br />
+                                    Or you can also upload a bar-separated file, with each line in format:<br />
+                                          sentence_id|source_sentence|machine_translation_to_repair(Optional)<br />
+                                                           <strong> OR </strong> <br />
+                                    A zip file of all the text documents to be translated. Max file size is 100 MB for free plans</p>
+                                }
                                 { type === TEXT_MODERATION &&
                                     <p>Please upload a text file with each line in file having sentence to be moderated.<br />
                                                            <strong> OR </strong> <br />
@@ -912,6 +915,12 @@ export default class TaggerImport extends Component {
                                 }
                                 { type === TEXT_CLASSIFICATION &&
                                     <p>Please upload a text file with each line in file having sentence to be classified.<br />
+                                                           <strong> OR </strong> <br />
+                                    A zip file of all the text documents to be classified. Max file size is 100 MB for free plans</p>
+                                }
+                                { type === SENTENCE_PAIR_CLASSIFIER &&
+                                    <p>Please upload a text file with each line in file having text pairs to be classified.<br />
+                                                        Format Expected: pair_id|textA|textB
                                                            <strong> OR </strong> <br />
                                     A zip file of all the text documents to be classified. Max file size is 100 MB for free plans</p>
                                 }
